@@ -1,0 +1,13 @@
+[Unit]
+Description=IR Remote irexec config, ustawienia w irexeckbd.config
+After=lircd.service
+Wants=lircd.service
+
+[Service]
+ExecStart=/usr/bin/irexec --daemon /home/pi/radio/irexeckbd.config
+Type=forking
+User=pi
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

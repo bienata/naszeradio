@@ -1,0 +1,13 @@
+[Unit]
+Description=Plastic Box Keyboard Service
+After=multi-user.target
+
+[Service]
+WorkingDirectory=/home/pi/radio
+User=pi
+Type=simple
+ExecStart=/usr/bin/python3 /home/pi/radio/kbd.py &> /dev/null
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

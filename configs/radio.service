@@ -1,0 +1,13 @@
+[Unit]
+Description=Internet Radio Service
+After=multi-user.target mpd.target
+
+[Service]
+WorkingDirectory=/home/pi/radio
+User=pi
+Type=simple
+ExecStart=/usr/bin/python3 /home/pi/radio/radio.py &> /dev/null
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
