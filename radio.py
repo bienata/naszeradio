@@ -5,7 +5,8 @@ from pathlib import Path
 import subprocess
 import time
 import os
-import socket 
+import biglcd
+
 #-------------------------------------------------------------------------------------
 SDD_STORAGE = "/mnt/usb_hdd_1/MP3"
 BUTTON_TEMP_FILE = "/tmp/remote_key.txt"
@@ -104,10 +105,12 @@ def getIdleScreenLine( n ):
         return str( len( availablePlaylists ) ) + "/" + str(titlesTotal) + "  " + sizes[2].replace("G","")+ "/"+ sizes[1].replace( "G","" ) + "GB"
 #-------------------------------------------------------------------------------------
 def fit20( s ):
-    return ( s + "                    " )[:20]
+    return ( s + "                    " )[:24]
 #-------------------------------------------------------------------------------------                
 def initLCD():
-    return CharLCD( cols = 20, rows = 2, pin_rs = 26, pin_e=24, pins_data=[16, 18, 22, 8], numbering_mode=GPIO.BOARD )
+    lcd = CharLCD( cols = 24, rows = 2, pin_rs = 26, pin_e=24, pins_data=[16, 18, 22, 8], numbering_mode=GPIO.BOARD )
+    biglcd.createLcdCustomChar( lcd )
+    return lcd
 #-------------------------------------------------------------------------------------                
 def queryShutDown():
     bar = "####################"
@@ -136,6 +139,44 @@ def shutDownRadio():
         pass
     return
 #-------------------------------------------------------------------------------------                
+def showIdleClock( s ):
+    t = now.strftime("%H%M%S")   # 0123ss
+    # 012345678901234567890123
+    # .  .  .  .  .  .  .  .    
+    biglcd.write(lcd, 0, ' ' )
+    biglcd.write(lcd, 1, ' ' )    
+    biglcd.write(lcd, 4, t[0:1] )
+    biglcd.write(lcd, 7, t[1:2] )
+    if s % 2 == 0:
+        biglcd.write(lcd, 10, ':' )
+    else:
+        biglcd.write(lcd, 10, ' ' )        
+    biglcd.write(lcd, 13, t[2:3] )
+    biglcd.write(lcd, 16, t[3:4] )
+    lcd.cursor_pos = (0, 19)    
+    lcd.write_string( "      " )
+    lcd.cursor_pos = (1, 19)    
+    lcd.write_string( ":" + t[4:] )        
+
+def showIdleInfo( lastSecond ):
+    lcd.cursor_pos = (0, 0)
+    dsi = subprocess.run( ["df","-h", SDD_STORAGE ,"--output=size,used,avail"], stdout=subprocess.PIPE ).stdout.decode('utf-8').splitlines()[1]
+    sizes = dsi.replace("   ", " ").replace("  ", " ").split(" ",3)                
+    lcd.write_string( fit20( "T:" + str(titlesTotal) + " A:" + str( len( availablePlaylists ) ) + " Z:" + sizes[2].replace("G","")+ "/" + sizes[1].replace( "G","" ) + "G       " ) )    
+    lcd.cursor_pos = (1, 0)    
+    lcd.write_string( fit20( now.strftime("%H:%M:%S") + " IP:" + getCurrentIp() ) )    
+
+def showNumQueue( q ):    
+    # 012345678901234567890123
+    # xxxyyyqqq   PLAY zaczyna        
+    biglcd.write(lcd, 0, q[0:1] )
+    biglcd.write(lcd, 3, q[1:2] )
+    biglcd.write(lcd, 6, q[2:3] )
+    biglcd.write(lcd, 9, ' ' )
+    lcd.cursor_pos = (0, 12)
+    lcd.write_string( "PLAY zaczyna"  )        
+    lcd.cursor_pos = (1, 12)
+    lcd.write_string( "            " )        
 # main
 GPIO.setwarnings( False ) 
 lcd = initLCD()
@@ -147,6 +188,10 @@ lastTitle = ""
 scrollPosition = 0
 infoCntr = 0
 titlesTotal = 0
+idleScreenMode=True
+numQueue="___"
+lastNumQueue="___"
+numQcntr=0
 
 setupMPC()
 initPlaylists()
@@ -155,18 +200,50 @@ while True:
     time.sleep( 0.1 ) 
     currentKey = checkIrButtons()    
     if currentKey != "":
-        lastKey = currentKey         
+        lastKey = currentKey    
+
+        if lastKey == "BTN_0":
+            numQueue += "0"
+        if lastKey == "BTN_1":
+            numQueue += "1"
+        if lastKey == "BTN_2":
+            numQueue += "2"
+        if lastKey == "BTN_3":
+            numQueue += "3"
+        if lastKey == "BTN_4":
+            numQueue += "4"
+        if lastKey == "BTN_5":
+            numQueue += "5"
+        if lastKey == "BTN_6":
+            numQueue += "6"
+        if lastKey == "BTN_7":
+            numQueue += "7"
+        if lastKey == "BTN_8":
+            numQueue += "8"
+        if lastKey == "BTN_9":
+            numQueue += "9"
+
+        if lastKey == "TITR":
+            idleScreenMode ^= True
+        
         if lastKey == "STOP":
             subprocess.run( ['mpc', 'stop'] )           
             
         if lastKey == "START":
             subprocess.run( ['mpc', 'play'] )           
             
-        if lastKey == "BTN_0":  # czyli `RESET` na panelu
-            currentPlaylistIdx = 0
-            playSelectedPlayList( currentPlaylistIdx )
+#        if lastKey == "BTN_0":  # czyli `RESET` na panelu
+#            currentPlaylistIdx = 0
+#            playSelectedPlayList( currentPlaylistIdx )
             
         if lastKey == "PLAY":  
+            if numQueue != "___":
+                toSearch = ("000" + numQueue.replace("_",""))[-3:]
+                for i in range (0, len( availablePlaylists )):
+                    if availablePlaylists[i][:3] == toSearch: 
+                        print(availablePlaylists[i])
+                        currentPlaylistIdx = i
+                        break                
             playSelectedPlayList( currentPlaylistIdx )
             
         if lastKey == "SEARCHPREV":
@@ -193,9 +270,21 @@ while True:
                 setupMPC()
                 initPlaylists()
                 lcd = initLCD()
-                
+    #
     now = datetime.now()    
-    if lastSecond != now.second: 
+    
+    if lastNumQueue != numQueue:        
+        numQueue = numQueue[-3:]
+        lastNumQueue = numQueue
+        numQcntr=60
+        showNumQueue( numQueue )
+        
+    numQcntr -= 1        
+    if numQcntr < 0:
+        numQueue="___"
+        lastNumQueue="___"
+        
+    if lastSecond != now.second and numQueue == "___": 
         lastSecond = now.second   
         # zbadaj stan mpc (wersja na piechotę)
         mpcResult = subprocess.run( ['mpc'], stdout = subprocess.PIPE )
@@ -216,12 +305,14 @@ while True:
             lcd.write_string( fit20( cleanStatusLine( mpcLines[1] ) ) )
         else:
             # tu nie gra
-            lcd.cursor_pos = (0, 0)
-            lcd.write_string( fit20 ( getIdleScreenLine ( infoCntr % 4 ) ) )        
-            if lastSecond % 3 == 0: infoCntr = infoCntr + 1
-            lcd.cursor_pos = (1, 0)    
-            lcd.write_string( fit20( "      " + now.strftime("%H:%M:%S") ) )    
-    lastKey = ""
+            if idleScreenMode == True:
+                showIdleClock( lastSecond )
+            else:
+                showIdleInfo( lastSecond )
+            #fi
+        #fi
+    #fi
+    lastKey = ""    
 
 # fin
 
