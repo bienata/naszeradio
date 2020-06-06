@@ -85,17 +85,6 @@ def playSelectedPlayList( idx ):
     subprocess.run( ['mpc', 'load', plname ] )
     subprocess.run( ['mpc', 'play', '1' ] )    
 #-------------------------------------------------------------------------------------    
-#def getIdleScreenLine( n ):
-#    if n == 0: #12345678901234567890
-#        return "NAS z e-Radio TT2020"
-#    if n == 1:
-#        return withZero( currentPlaylistIdx ) + "/" + withZero( len( availablePlaylists ) ) + " plikow:" + str(titlesTotal)
-#    if n == 2:
-#        dsi = subprocess.run( ["df","-h", SDD_STORAGE ,"--output=size,used,avail"], stdout=subprocess.PIPE ).stdout.decode('utf-8').splitlines()[1]
-#        sizes = dsi.replace("   ", " ").replace("  ", " ").split(" ",3)                
-#        return "wolne: " + sizes[3].replace("G","")+ " z "+ sizes[1].replace( "G","" ) + " GB"
-#    if n == 3:
-#        return "ip: " + getCurrentIp()
 def getIdleScreenLine( n ):
     if n == 0 or n == 1: #12345678901234567890
         return "NAS z e-Radio TT2020"
@@ -140,23 +129,34 @@ def shutDownRadio():
     return
 #-------------------------------------------------------------------------------------                
 def showIdleClock( s ):
+    lcd.cursor_pos = (0, 0)    
+    lcd.write_string( "   " )
+    lcd.cursor_pos = (1, 0)    
+    lcd.write_string( "   " )
+    lcd.cursor_pos = (0, 6)    
+    lcd.write_string( " " )
+    lcd.cursor_pos = (1, 6)    
+    lcd.write_string( " " )
+    lcd.cursor_pos = (0, 16)    
+    lcd.write_string( " " )
+    lcd.cursor_pos = (1, 16)    
+    lcd.write_string( " " )
+
     t = now.strftime("%H%M%S")   # 0123ss
     # 012345678901234567890123
     # .  .  .  .  .  .  .  .    
-    biglcd.write(lcd, 0, ' ' )
-    biglcd.write(lcd, 1, ' ' )    
-    biglcd.write(lcd, 4, t[0:1] )
+    biglcd.write(lcd, 3, t[0:1] )
     biglcd.write(lcd, 7, t[1:2] )
     if s % 2 == 0:
         biglcd.write(lcd, 10, ':' )
     else:
         biglcd.write(lcd, 10, ' ' )        
     biglcd.write(lcd, 13, t[2:3] )
-    biglcd.write(lcd, 16, t[3:4] )
-    lcd.cursor_pos = (0, 19)    
+    biglcd.write(lcd, 17, t[3:4] )
+    lcd.cursor_pos = (0, 20)    
     lcd.write_string( "      " )
-    lcd.cursor_pos = (1, 19)    
-    lcd.write_string( ":" + t[4:] )        
+    lcd.cursor_pos = (1, 20)    
+    lcd.write_string( " :" + t[4:] )        
 
 def showIdleInfo( lastSecond ):
     lcd.cursor_pos = (0, 0)
@@ -174,7 +174,7 @@ def showNumQueue( q ):
     biglcd.write(lcd, 6, q[2:3] )
     biglcd.write(lcd, 9, ' ' )
     lcd.cursor_pos = (0, 12)
-    lcd.write_string( "PLAY zaczyna"  )        
+    lcd.write_string( "            "  )        
     lcd.cursor_pos = (1, 12)
     lcd.write_string( "            " )        
 # main
@@ -231,19 +231,8 @@ while True:
             
         if lastKey == "START":
             subprocess.run( ['mpc', 'play'] )           
-            
-#        if lastKey == "BTN_0":  # czyli `RESET` na panelu
-#            currentPlaylistIdx = 0
-#            playSelectedPlayList( currentPlaylistIdx )
-            
+                        
         if lastKey == "PLAY":  
-            if numQueue != "___":
-                toSearch = ("000" + numQueue.replace("_",""))[-3:]
-                for i in range (0, len( availablePlaylists )):
-                    if availablePlaylists[i][:3] == toSearch: 
-                        print(availablePlaylists[i])
-                        currentPlaylistIdx = i
-                        break                
             playSelectedPlayList( currentPlaylistIdx )
             
         if lastKey == "SEARCHPREV":
@@ -276,13 +265,26 @@ while True:
     if lastNumQueue != numQueue:        
         numQueue = numQueue[-3:]
         lastNumQueue = numQueue
-        numQcntr=60
+        numQcntr=70
         showNumQueue( numQueue )
-        
-    numQcntr -= 1        
-    if numQcntr < 0:
-        numQueue="___"
-        lastNumQueue="___"
+
+    if numQcntr > 0:
+        numQcntr -= 1        
+        if numQcntr < 10:
+            if numQcntr % 2 == 0:
+                showNumQueue( numQueue )
+            else:
+                showNumQueue( '___' )
+        if numQcntr <= 0:
+            toSearch = ("000" + numQueue.replace("_",""))[-3:]
+            for i in range (0, len( availablePlaylists )):
+                if availablePlaylists[i][:3] == toSearch: 
+                    print(availablePlaylists[i])
+                    currentPlaylistIdx = i
+                    break                
+            playSelectedPlayList( currentPlaylistIdx )            
+            numQueue="___"
+            lastNumQueue="___"            
         
     if lastSecond != now.second and numQueue == "___": 
         lastSecond = now.second   

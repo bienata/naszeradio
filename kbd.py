@@ -16,7 +16,7 @@ def onKeyPressed( channel ):
     if GPIO.input( channel ) == True: return 
     time.sleep( 0.5 )
     BUTTON_TEMP_FILE = "/tmp/remote_key.txt"
-    keyMapping = { KEY_SKIP : "SKIPNEXT", KEY_NEXT : "SEARCHNEXT", KEY_START : "START", KEY_RESET : "BTN_0", KEY_STOP : "STOP", KEY_OUTS : "STANDBY" }
+    keyMapping = { KEY_SKIP : "SKIPNEXT", KEY_NEXT : "SEARCHNEXT", KEY_START : "PLAY", KEY_RESET : "BTN_0", KEY_STOP : "STOP", KEY_OUTS : "STANDBY" }
     file = open( BUTTON_TEMP_FILE, "w" )
     file.write( keyMapping[ channel ] )
     file.close()
